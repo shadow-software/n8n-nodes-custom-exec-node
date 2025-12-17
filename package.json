@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-custom-exec",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Execute bash commands and scripts inside n8n v2 container, with templating support.",
   "keywords": [
     "n8n-community-node-package",
