@@ -1,0 +1,70 @@
+{
+  "name": "n8n-nodes-custom-exec",
+  "version": "1.0.0",
+  "description": "Execute bash commands and scripts inside n8n v2 container, with templating support.",
+  "keywords": [
+    "n8n-community-node-package",
+    "n8n-node",
+    "exec",
+    "bash",
+    "command"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/shadow-software/n8n-nodes-custom-exec-node",
+  "author": {
+    "name": "Shadow Software LLC",
+    "email": "hello@shadowsoftware.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shadow-software/n8n-nodes-custom-exec-node.git"
+  },
+  "bugs": {
+    "url": "https://github.com/shadow-software/n8n-nodes-custom-exec-node/issues"
+  },
+  "main": "dist/nodes/CustomExecNode/CustomExecNode.node.js",
+  "scripts": {
+    "prepare": "npm run build",
+    "build": "tsc && gulp build:icons",
+    "dev": "tsc --watch",
+    "format": "prettier nodes credentials --write",
+    "lint": "eslint nodes credentials package.json",
+    "lintfix": "eslint nodes credentials package.json --fix",
+    "prepublishOnly": "npm run build",
+    "version:patch": "npm version patch",
+    "version:minor": "npm version minor",
+    "version:major": "npm version major",
+    "docker:start": "docker-compose up -d",
+    "docker:stop": "docker-compose down",
+    "docker:restart": "docker-compose restart",
+    "docker:logs": "docker-compose logs -f",
+    "docker:ffmpeg": "docker-compose -f docker-compose.ffmpeg.yml up -d",
+    "setup": "npm install && npm run build && npm run docker:start",
+    "clean": "rm -rf dist node_modules package-lock.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "credentials": [],
+    "nodes": [
+      "dist/nodes/CustomExecNode/CustomExecNode.node.js"
+    ]
+  },
+  "devDependencies": {
+    "@typescript-eslint/parser": "^5.59.0",
+    "eslint": "^8.40.0",
+    "eslint-plugin-n8n-nodes-base": "^1.11.0",
+    "gulp": "^4.0.2",
+    "n8n-workflow": "^1.0.0",
+    "prettier": "^2.8.8",
+    "typescript": "^5.0.4"
+  },
+  "peerDependencies": {
+    "n8n-workflow": "*"
+  },
+  "dependencies": {
+    "n8n-core": "*"
+  }
+}

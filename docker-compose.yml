@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n-custom-exec
+    ports:
+      - "5678:5678"
+    environment:
+      # Basic settings
+      - N8N_BASIC_AUTH_ACTIVE=false
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - NODE_ENV=production
+
+      # Timezone
+      - GENERIC_TIMEZONE=America/New_York
+
+      # Execution settings
+      - EXECUTIONS_TIMEOUT=3600
+      - EXECUTIONS_TIMEOUT_MAX=7200
+
+      # Optional: Enable webhook testing
+      - WEBHOOK_URL=http://localhost:5678/
+
+    volumes:
+      # n8n data persistence
+      - n8n_data:/home/node/.n8n
+
+      # Mount the custom exec node
+      - ./dist:/home/node/.n8n/custom
+
+      # Optional: Mount directories for file operations
+      # Uncomment these if you need to process files
+      # - ./data/input:/home/node/input
+      # - ./data/output:/home/node/output
+      # - ./data/temp:/home/node/temp
+
+    restart: unless-stopped
+
+    # Optional: Resource limits
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '2'
+    #       memory: 2G
+    #     reservations:
+    #       cpus: '1'
+    #       memory: 1G
+
+volumes:
+  n8n_data:
+    driver: local
+
+# Optional: Add a network for connecting to other services
+# networks:
+#   n8n-network:
+#     driver: bridge

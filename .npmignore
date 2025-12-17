@@ -1,0 +1,53 @@
+# Source files
+nodes/**/*.ts
+credentials/**/*.ts
+tsconfig.json
+gulpfile.js
+
+# Development files
+.github/
+.vscode/
+.git/
+.gitignore
+.gitattributes
+.eslintrc.js
+.prettierrc.js
+*.tsbuildinfo
+
+# Documentation (optional - remove if you want to include)
+examples/
+QUICKSTART.md
+INSTALLATION.md
+USAGE_EXAMPLES.md
+PROJECT_SUMMARY.md
+
+# Docker files
+docker-compose*.yml
+Dockerfile*
+data/
+
+# Build artifacts
+*.log
+*.tgz
+node_modules/
+
+# Test files
+test/
+tests/
+*.test.js
+*.spec.js
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+.vscode/
+*.sublime-*
+
+# Misc
+.claude/

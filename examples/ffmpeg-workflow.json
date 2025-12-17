@@ -1,0 +1,74 @@
+{
+  "name": "FFmpeg Image Processing Example",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Start",
+      "type": "n8n-nodes-base.start",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "filename",
+              "value": "image-001"
+            },
+            {
+              "name": "title",
+              "value": "Welcome to n8n"
+            },
+            {
+              "name": "slug",
+              "value": "welcome-to-n8n"
+            },
+            {
+              "name": "index",
+              "value": "1"
+            }
+          ]
+        }
+      },
+      "name": "Set Test Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "command": "ffmpeg -i /home/node/input/{{ $json.filename }}.png -vf \"drawtext=text='{{ $json.title }}':fontfile=/usr/share/fonts/truetype/bebas/BebasNeue-Regular.ttf:fontsize=70:fontcolor=#FFDE21:x=(w-text_w)/2:y=(h-text_h)/2\" /home/node/output/{{ $json.slug }}.webp",
+        "cwd": "/home/node"
+      },
+      "name": "Process Image with FFmpeg",
+      "type": "n8n-nodes-custom-exec.customExecNode",
+      "typeVersion": 1,
+      "position": [650, 300]
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Set Test Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Test Data": {
+      "main": [
+        [
+          {
+            "node": "Process Image with FFmpeg",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

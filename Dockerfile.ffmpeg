@@ -1,0 +1,39 @@
+# Custom n8n image with FFmpeg and ImageMagick pre-installed
+# Use this if you need media processing capabilities
+
+FROM n8nio/n8n:latest
+
+# Switch to root to install packages
+USER root
+
+# Install FFmpeg, ImageMagick, and other useful tools
+RUN apk add --no-cache \
+    ffmpeg \
+    imagemagick \
+    python3 \
+    py3-pip \
+    curl \
+    wget \
+    git \
+    bash
+
+# Install common fonts for text overlays
+RUN apk add --no-cache \
+    ttf-dejavu \
+    font-noto \
+    font-noto-emoji
+
+# Optional: Install additional Python packages
+# RUN pip3 install --no-cache-dir \
+#     pandas \
+#     pillow \
+#     opencv-python-headless
+
+# Create directories for file operations
+RUN mkdir -p /home/node/input /home/node/output /home/node/temp && \
+    chown -R node:node /home/node
+
+# Switch back to node user
+USER node
+
+# The custom exec node will be mounted at runtime

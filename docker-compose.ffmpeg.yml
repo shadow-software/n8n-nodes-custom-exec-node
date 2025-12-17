@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  n8n:
+    build:
+      context: .
+      dockerfile: Dockerfile.ffmpeg
+    container_name: n8n-ffmpeg
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=false
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - NODE_ENV=production
+      - GENERIC_TIMEZONE=America/New_York
+      - EXECUTIONS_TIMEOUT=3600
+      - EXECUTIONS_TIMEOUT_MAX=7200
+    volumes:
+      # n8n data
+      - n8n_data:/home/node/.n8n
+
+      # Custom exec node
+      - ./dist:/home/node/.n8n/custom
+
+      # File processing directories
+      - ./data/input:/home/node/input
+      - ./data/output:/home/node/output
+      - ./data/temp:/home/node/temp
+
+    restart: unless-stopped
+
+volumes:
+  n8n_data:
+    driver: local
