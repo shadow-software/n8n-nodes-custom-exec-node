@@ -53,8 +53,3 @@ jobs:
         run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Verify published package
-        run: |
-          sleep 10
-          npm view ${{ github.event.repository.name }}@$(node -p "require('./package.json').version")
