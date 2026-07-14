@@ -27,7 +27,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write # release job needs this to create a GitHub Release
   id-token: write # required to mint the provenance attestation
 
 jobs:
@@ -185,3 +185,28 @@ jobs:
           npm access grant read-write shadow-software:developers "$(node -p "require('./package.json').name")" \
             || echo "::warning::could not grant org access — run 'npm access grant read-write shadow-software:developers n8n-nodes-custom-exec' by hand"
           rm -f ~/.npmrc
+
+      # Zip exactly what npm just shipped (dist/, package.json, README.md, LICENSE.md)
+      # and attach it to a GitHub Release. Re-derived from `npm pack`, not hand-copied,
+      # so the release zip can never drift from the tarball contents already verified
+      # above.
+      - name: Build release zip from the published tarball contents
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          name="$(node -p "require('./package.json').name")"
+          staging="/tmp/release/${name}"
+          mkdir -p "$staging"
+          cp -r dist "$staging/"
+          cp package.json README.md LICENSE.md "$staging/"
+          (cd /tmp/release && zip -r "/tmp/${name}-${version}.zip" "${name}")
+          echo "ZIP_PATH=/tmp/${name}-${version}.zip" >> "$GITHUB_ENV"
+          echo "RELEASE_VERSION=${version}" >> "$GITHUB_ENV"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${RELEASE_VERSION}" "${ZIP_PATH}" \
+            --title "v${RELEASE_VERSION}" \
+            --generate-notes \
+            --latest

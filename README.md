@@ -178,6 +178,12 @@ own tree, so those advisories are resolved by upgrading n8n, not this package.
 - **n8n community nodes** — [installation & docs](https://docs.n8n.io/integrations/community-nodes/)
 - **Also by us** — [n8n-nodes-huggingface-space](https://www.npmjs.com/package/n8n-nodes-huggingface-space): run image, video, music, speech, text and moderation models from any Hugging Face Space.
 
+We also build and open-source a family of WordPress plugins and themes for
+WooCommerce stores: [Broadside](https://github.com/shadow-software/broadside-theme-for-woocommerce)
+(theme) and [Broadside Blocks](https://github.com/shadow-software/broadside-blocks-for-woocommerce),
+[Crypto for WooCommerce](https://github.com/shadow-software/crypto-for-woocommerce), and
+[AGT for WooCommerce](https://github.com/shadow-software/agt-for-woocommerce).
+
 ## About
 
 Made by **[Shadow Software](https://shadowsoftware.com)** — we build and run
