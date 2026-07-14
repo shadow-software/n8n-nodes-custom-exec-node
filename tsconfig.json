@@ -15,8 +15,8 @@
 		"preserveConstEnums": true,
 		"esModuleInterop": true,
 		"resolveJsonModule": true,
-		"declaration": true,
-		"sourceMap": true,
+		"declaration": false,
+		"sourceMap": false,
 		"skipLibCheck": true,
 		"outDir": "./dist/",
 		"types": ["node"]

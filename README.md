@@ -25,7 +25,12 @@ an optional shared secret — so the node reads nothing from the environment. Th
 both what n8n's node verification requires and what lets one n8n instance talk to
 several exec services.
 
-[Installation](#installation) · [Credentials](#credentials) · [Usage](#usage) · [Response](#response) · [Security](#security) · [Compatibility](#compatibility)
+> Built and maintained by **[Shadow Software](https://shadowsoftware.com)** — we run
+> n8n in production across a family of products and open-source the nodes we rely on.
+> See our other node, **[n8n-nodes-huggingface-space](https://www.npmjs.com/package/n8n-nodes-huggingface-space)**,
+> for running AI models from any Hugging Face Space.
+
+[Installation](#installation) · [Credentials](#credentials) · [The exec service](#the-exec-service) · [Usage](#usage) · [Response](#response) · [Security](#security) · [Compatibility](#compatibility)
 
 ## Installation
 
@@ -52,13 +57,46 @@ The credential's **Test** button issues a `GET {baseUrl}/health`, so your servic
 should answer that path with a 200 for the test to pass. Testing never runs a
 command.
 
-The exec service itself is yours to run. It must accept
-`POST {baseUrl}/exec` with a JSON body of `{ "command": "...", "timeout": 300 }`
-and reply with JSON:
+## The exec service
 
-```jsonc
-{ "exitCode": 0, "stdout": "…", "stderr": "…", "durationMs": 1234 }
+The exec service is yours to run — the node is only the n8n client. Any HTTP server
+works as long as it honours this tiny contract:
+
+| Route | Purpose |
+| --- | --- |
+| `POST /exec` | body `{ "command": string, "timeout": number }` → `{ "exitCode": number, "stdout": string, "stderr": string, "durationMs": number }` |
+| `GET /health` | `200` when healthy (used by the credential's **Test** button) |
+
+A minimal reference implementation is a few dozen lines. For example, in Node:
+
+```js
+import express from 'express';
+import { exec } from 'node:child_process';
+
+const app = express();
+app.use(express.json());
+const TOKEN = process.env.EXEC_TOKEN; // set the same value on the credential
+
+app.get('/health', (_req, res) => res.sendStatus(200));
+
+app.post('/exec', (req, res) => {
+  if (TOKEN && req.get('X-EXEC-TOKEN') !== TOKEN) return res.sendStatus(401);
+  const { command, timeout = 300 } = req.body ?? {};
+  const started = Date.now();
+  exec(command, { timeout: Math.min(timeout, 1800) * 1000, maxBuffer: 64 << 20 },
+    (err, stdout, stderr) => res.json({
+      exitCode: err?.code ?? 0,
+      stdout, stderr,
+      durationMs: Date.now() - started,
+    }));
+});
+
+app.listen(8080);
 ```
+
+Run it in a container that has the tooling you need (`ffmpeg`, fonts, `imagemagick`,
+…) alongside n8n, mount a shared volume into both, and point the credential at it.
+Read the **[Security](#security)** section before you expose it anywhere.
 
 ## Usage
 
@@ -133,10 +171,19 @@ A plain `npm audit` does report advisories. Every one of them comes from
 `n8n-workflow`, which is a **peer** dependency: n8n supplies it at runtime from its
 own tree, so those advisories are resolved by upgrading n8n, not this package.
 
-## Resources
+## Links
 
-- [n8n community nodes documentation](https://docs.n8n.io/integrations/community-nodes/)
-- [Creating an HTTP exec sidecar](https://github.com/shadow-software/n8n-nodes-custom-exec-node)
+- **npm** — [n8n-nodes-custom-exec](https://www.npmjs.com/package/n8n-nodes-custom-exec)
+- **Source** — [github.com/shadow-software/n8n-nodes-custom-exec-node](https://github.com/shadow-software/n8n-nodes-custom-exec-node)
+- **n8n community nodes** — [installation & docs](https://docs.n8n.io/integrations/community-nodes/)
+- **Also by us** — [n8n-nodes-huggingface-space](https://www.npmjs.com/package/n8n-nodes-huggingface-space): run image, video, music, speech, text and moderation models from any Hugging Face Space.
+
+## About
+
+Made by **[Shadow Software](https://shadowsoftware.com)** — we build and run
+automation-heavy SaaS products and open-source the n8n nodes we depend on. If you
+need custom n8n nodes, workflow automation, or a platform built around it, get in
+touch at **[shadowsoftware.com](https://shadowsoftware.com)**.
 
 ## License
 
