@@ -88,11 +88,16 @@ export class RemoteExec implements INodeType {
 		const items = this.getInputData();
 		const returnData: INodeExecutionData[] = [];
 
+		// Only the connection endpoint is read here; the token is NOT read into the
+		// node. The X-EXEC-TOKEN header is applied by the credential's
+		// IAuthenticateGeneric via httpRequestWithAuthentication() below — n8n's rule
+		// (and good practice) is that a node reading a credential must not hand-build
+		// its own auth header. That also means the token benefits from any future n8n
+		// auth handling (refresh, audit) for free.
 		const credentials = await this.getCredentials('remoteExecApi');
 		const baseUrl = String(credentials.baseUrl ?? '')
 			.trim()
 			.replace(/\/$/, '');
-		const token = String(credentials.token ?? '');
 
 		if (!baseUrl) {
 			throw new NodeOperationError(
@@ -114,21 +119,20 @@ export class RemoteExec implements INodeType {
 					throw new NodeOperationError(this.getNode(), 'Command cannot be empty', { itemIndex });
 				}
 
-				const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-				if (token) {
-					headers['X-EXEC-TOKEN'] = token;
-				}
-
 				let response: { exitCode: number; stdout: string; stderr: string; durationMs: number };
 				try {
-					response = (await this.helpers.httpRequest({
-						method: 'POST',
-						url: `${baseUrl}/exec`,
-						headers,
-						body: { command, timeout },
-						json: true,
-						timeout: (timeout + 30) * 1000,
-					})) as typeof response;
+					response = (await this.helpers.httpRequestWithAuthentication.call(
+						this,
+						'remoteExecApi',
+						{
+							method: 'POST',
+							url: `${baseUrl}/exec`,
+							headers: { 'Content-Type': 'application/json' },
+							body: { command, timeout },
+							json: true,
+							timeout: (timeout + 30) * 1000,
+						},
+					)) as typeof response;
 				} catch (err) {
 					const e = err as Error;
 					throw new NodeOperationError(

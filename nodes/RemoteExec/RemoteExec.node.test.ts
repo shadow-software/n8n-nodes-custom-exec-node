@@ -30,7 +30,12 @@ function makeCtx(opts: {
 	continueOnFail?: boolean;
 }) {
 	const items = opts.items ?? [{ json: {} }];
-	const httpRequest = opts.httpRequest ?? vi.fn(async () => ok());
+	// The node calls this.helpers.httpRequestWithAuthentication.call(this, credName, opts):
+	// the credential type is arg 0, the request options arg 1. Auth (the X-EXEC-TOKEN
+	// header) is applied by n8n from the credential's IAuthenticateGeneric, NOT by the
+	// node — so the node no longer builds that header, and the tests assert the
+	// credential TYPE is passed rather than inspecting a hand-built header.
+	const httpRequestWithAuthentication = opts.httpRequest ?? vi.fn(async () => ok());
 	const ctx = {
 		getInputData: () => items,
 		getNodeParameter: vi.fn((name: string, _i: number, dflt: unknown) =>
@@ -40,13 +45,17 @@ function makeCtx(opts: {
 		continueOnFail: () => opts.continueOnFail ?? false,
 		getCredentials: vi.fn(async () => {
 			if (opts.credential instanceof Error) throw opts.credential;
-			// Default: a base URL and a token unless the test overrides.
 			return opts.credential ?? { baseUrl: 'http://exec-sidecar:8080', token: 'sekret' };
 		}),
-		helpers: { httpRequest },
+		helpers: { httpRequestWithAuthentication },
 	};
-	return { ctx, httpRequest };
+	return { ctx, httpRequest: httpRequestWithAuthentication };
 }
+
+/** The request options the node passed — arg 1 of httpRequestWithAuthentication. */
+const reqOf = (spy: ReturnType<typeof vi.fn>, call = 0) => spy.mock.calls[call][1];
+/** The credential type the node passed — arg 0. */
+const credOf = (spy: ReturnType<typeof vi.fn>, call = 0) => spy.mock.calls[call][0];
 
 const run = (ctx: unknown) => RemoteExec.prototype.execute.call(ctx as never);
 
@@ -77,7 +86,8 @@ describe('RemoteExec.execute', () => {
 		const [out] = await run(ctx);
 
 		expect(httpRequest).toHaveBeenCalledTimes(1);
-		const call = httpRequest.mock.calls[0][0];
+		const call = reqOf(httpRequest);
+		expect(credOf(httpRequest)).toBe('remoteExecApi'); // auth via the credential
 		expect(call.method).toBe('POST');
 		expect(call.url).toBe('http://exec-sidecar:8080/exec');
 		expect(call.body).toEqual({ command: 'echo hello', timeout: 300 });
@@ -107,12 +117,13 @@ describe('RemoteExec.execute', () => {
 			await run(ctx);
 
 			expect(ctx.getCredentials).toHaveBeenCalledWith('remoteExecApi');
-			const call = httpRequest.mock.calls[0][0];
+			// auth is delegated to the credential type; the node passes it by name
+			expect(credOf(httpRequest)).toBe('remoteExecApi');
+			const call = reqOf(httpRequest);
 			expect(call.url).toBe('http://from-cred:8080/exec');
-			expect(call.headers['X-EXEC-TOKEN']).toBe('cred-token');
 			// nothing from the environment leaked through
 			expect(call.url).not.toContain('env-should-be-ignored');
-			expect(call.headers['X-EXEC-TOKEN']).not.toContain('env-token');
+			expect(JSON.stringify(call)).not.toContain('env-token');
 		} finally {
 			OLD_URL === undefined ? delete process.env.EXEC_SIDECAR_URL : (process.env.EXEC_SIDECAR_URL = OLD_URL);
 			OLD_TOK === undefined ? delete process.env.EXEC_SIDECAR_TOKEN : (process.env.EXEC_SIDECAR_TOKEN = OLD_TOK);
@@ -125,35 +136,37 @@ describe('RemoteExec.execute', () => {
 			credential: { baseUrl: 'http://exec-sidecar:8080/', token: '' },
 		});
 		await run(ctx);
-		expect(httpRequest.mock.calls[0][0].url).toBe('http://exec-sidecar:8080/exec');
+		expect(reqOf(httpRequest).url).toBe('http://exec-sidecar:8080/exec');
 	});
 
-	test('the X-EXEC-TOKEN header is present when a token is set', async () => {
+	test('auth is delegated to the credential, so the node never hand-builds a token header', async () => {
+		// The whole point of the httpRequestWithAuthentication switch: the node must
+		// NOT put the token in a header itself (the scanner rule
+		// no-http-request-with-manual-auth). n8n applies the credential's
+		// IAuthenticateGeneric (X-EXEC-TOKEN = {{$credentials.token}}) for us.
 		const { ctx, httpRequest } = makeCtx({
 			params: BASE_PARAMS,
 			credential: { baseUrl: 'http://exec-sidecar:8080', token: 'tok123' },
 		});
 		await run(ctx);
-		expect(httpRequest.mock.calls[0][0].headers['X-EXEC-TOKEN']).toBe('tok123');
+		expect(credOf(httpRequest)).toBe('remoteExecApi');
+		const call = reqOf(httpRequest);
+		// the node sets only Content-Type; the token header is the credential's job
+		expect(call.headers).toEqual({ 'Content-Type': 'application/json' });
+		expect(JSON.stringify(call)).not.toContain('tok123');
 	});
 
-	test('the X-EXEC-TOKEN header is absent when the token is empty', async () => {
-		const { ctx, httpRequest } = makeCtx({
-			params: BASE_PARAMS,
-			credential: { baseUrl: 'http://exec-sidecar:8080', token: '' },
-		});
-		await run(ctx);
-		const headers = httpRequest.mock.calls[0][0].headers;
-		expect('X-EXEC-TOKEN' in headers).toBe(false);
-	});
-
-	test('a credential with no token field at all is treated as unauthenticated', async () => {
+	test('a credential with no token field at all still works (unauthenticated)', async () => {
+		// The node never reads the token, so a missing one is a non-event: it just
+		// calls through, and the credential (empty token) applies no meaningful header.
 		const { ctx, httpRequest } = makeCtx({
 			params: BASE_PARAMS,
 			credential: { baseUrl: 'http://exec-sidecar:8080' },
 		});
-		await run(ctx);
-		expect('X-EXEC-TOKEN' in httpRequest.mock.calls[0][0].headers).toBe(false);
+		const [out] = await run(ctx);
+		expect(credOf(httpRequest)).toBe('remoteExecApi');
+		expect(reqOf(httpRequest).headers).toEqual({ 'Content-Type': 'application/json' });
+		expect(out[0].json.exec).toMatchObject({ exitCode: 0 });
 	});
 
 	test('a non-zero exit throws a NodeOperationError with the exit code and stderr', async () => {
