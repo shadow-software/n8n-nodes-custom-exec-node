@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 60 60" role="img" aria-label="Remote Exec by Shadow Software">
+  <title>Remote Exec</title>
+
+  <!-- Shadow Software hexagon: the house mark, signature green on near-black. -->
+  <path d="M30 2.5 53 15.75v26.5L30 55.5 7 42.25v-26.5z"
+        fill="#0d0d0d" stroke="#8fd468" stroke-width="2.8" stroke-linejoin="round"/>
+
+  <!-- A shell prompt: chevron + cursor. Two heavy strokes so it survives the ~40px
+       render on the n8n canvas, where anything finer turns to mush. -->
+  <path d="M19 22.5 27.5 30 19 37.5"
+        fill="none" stroke="#8fd468" stroke-width="4.2"
+        stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Blinking cursor bar, as on a live terminal. -->
+  <rect x="31.5" y="34.6" width="12" height="4" rx="2" fill="#ededed">
+    <animate attributeName="opacity" values="1;1;0.15;0.15;1" dur="1.6s" repeatCount="indefinite"/>
+  </rect>
+</svg>

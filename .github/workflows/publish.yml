@@ -1,0 +1,187 @@
+name: Publish to npm
+
+# n8n will not verify a community node published from a developer's laptop: from
+# 2026-05-01 a verified package must be published by CI with an npm provenance
+# statement, which cryptographically ties the tarball to this repo and this
+# workflow run. Hence `id-token: write` and `--provenance` below.
+#
+# Setup, once, before the first release:
+#   1. On npmjs.com, add this repo as a Trusted Publisher for the package
+#      (Settings -> Trusted Publishers -> GitHub Actions, workflow: publish.yml).
+#   2. Push a tag: `npm version patch && git push --follow-tags`.
+# No NPM_TOKEN secret is needed — Trusted Publishing exchanges the OIDC token.
+
+on:
+  # Auto-deploy on push to the default branch. A `v*` tag still works too (and is
+  # what a manual `npm version` produces), but you don't NEED to tag: just bump the
+  # version in package.json and push.
+  push:
+    branches: [main, master]
+    tags:
+      - 'v*'
+    paths:
+      - 'nodes/**'
+      - 'credentials/**'
+      - 'package.json'
+      - '.github/workflows/publish.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # required to mint the provenance attestation
+
+jobs:
+  # Publishing a version that already exists is a hard npm error, so a branch push
+  # must only publish when the version in package.json actually CHANGED. This gate
+  # diffs package.json against the previous commit; a normal push (docs, a fix
+  # without a bump) is a clean no-op, and bumping the version is what ships.
+  # A tag push always publishes (the version was bumped to create it).
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      should_publish: ${{ steps.decide.outputs.should_publish }}
+      version: ${{ steps.decide.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2 # need the previous commit to diff the version
+      - id: decide
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "tag push -> publish v$version"
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          prev="$(git show HEAD~1:package.json 2>/dev/null | node -pe 'JSON.parse(require("fs").readFileSync(0)).version' 2>/dev/null || echo none)"
+          if [[ "$version" != "$prev" ]]; then
+            echo "version changed $prev -> $version -> publish"
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "version unchanged ($version) -> nothing to publish"
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  publish:
+    needs: check
+    if: ${{ needs.check.outputs.should_publish == 'true' }}
+    runs-on: ubuntu-latest
+
+    # Hoisted to the JOB so the org-grant step's `if:` can read it. The `secrets`
+    # context is NOT available inside an `if:` — not at job level and not at step
+    # level — and a step's own `env:` is not in scope for its own `if:` either. A
+    # job-level env is the one thing that works.
+    env:
+      HAVE_ADMIN_TOKEN: ${{ secrets.NPM_ADMIN_TOKEN != '' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 22, NOT 20: npm's Trusted Publishing requires npm >= 11.5.1 and Node >=
+      # 22.14.0. Node 20 ships an npm far older than that, and `npm publish` would
+      # fail to exchange the OIDC token — an auth failure at the very last step, after
+      # lint, tests and build had all passed, and only ever visible on a real release.
+      # The node itself still SUPPORTS Node 20 at runtime (see CI, which tests both);
+      # this pin is purely about the publishing toolchain.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
+
+      # setup-node's bundled npm can lag; pin the floor Trusted Publishing needs.
+      - name: Ensure an npm that supports Trusted Publishing
+        run: |
+          npm install -g npm@latest
+          echo "npm $(npm --version) on node $(node --version)"
+          node -e "
+            const [maj, min, pat] = process.versions.node.split('.').map(Number);
+            const ok = maj > 22 || (maj === 22 && (min > 14 || (min === 14 && pat >= 0)));
+            if (!ok) { console.error('Node ' + process.versions.node + ' < 22.14.0 — Trusted Publishing will fail'); process.exit(1); }
+          "
+
+      # `n8n-workflow` pulls in `isolated-vm`, a native addon whose postinstall
+      # compiles C++. We only need its type declarations, so skip install scripts
+      # rather than install a toolchain to build something we never load.
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      # Fails the release if `files`/.npmignore ever let a source or test file into
+      # the tarball, or if dist is missing.
+      #
+      # Two things bit us here, both only visible on a cold runner:
+      #
+      #  1. `npm pack` fires prepublishOnly (build + lint + test), and that output
+      #     landed in the SAME redirect as the --json payload, so pack.json was test
+      #     output followed by JSON. Hence --ignore-scripts: lint, test and build are
+      #     already explicit steps above, so re-running them here bought nothing.
+      #
+      #  2. npm's --json manifest has THREE shapes across versions. The runner's npm
+      #     emits a map KEYED BY PACKAGE NAME:
+      #         { "n8n-nodes-custom-exec": { files: [...] } }
+      #     while older npm emits a bare array, and some emit a bare object. Guessing
+      #     cost two failed releases; this normalises all three.
+      - name: Verify package contents
+        run: |
+          npm pack --dry-run --json --ignore-scripts > /tmp/pack.json
+          node -e "
+            const raw = require('/tmp/pack.json');
+            const entry =
+              Array.isArray(raw)      ? raw[0]                       // [ {...} ]
+              : raw && raw.files      ? raw                          // { files: [...] }
+              : raw                   ? Object.values(raw)[0]        // { '<pkg>': {...} }
+              : null;
+            if (!entry || !Array.isArray(entry.files)) {
+              console.error('could not read the tarball manifest. npm pack --json gave:');
+              console.error(JSON.stringify(raw).slice(0, 400));
+              process.exit(1);
+            }
+            const files = entry.files.map(f => f.path);
+            const stray = files.filter(f => !f.startsWith('dist/') && !/^(package\.json|README\.md|LICENSE\.md)$/.test(f));
+            if (stray.length) {
+              console.error('Unexpected files in the published tarball:', stray);
+              process.exit(1);
+            }
+            if (!files.some(f => f.endsWith('.svg'))) {
+              console.error('No SVG in the tarball — the node icon would be broken.');
+              process.exit(1);
+            }
+            console.log('Tarball OK:', files.length, 'files');
+          "
+
+      - name: Publish
+        run: npm publish --provenance --access public
+
+      # Hand the package to the org on its FIRST publish.
+      #
+      # The package name is unscoped on purpose (16 of the top 20 n8n community nodes
+      # are, and it is what a user types into n8n's "Install community node" box), but
+      # npm lets an ORGANISATION manage an unscoped package — so we get the short name
+      # AND org ownership, exactly as n8n-nodes-custom-exec does.
+      #
+      # This cannot be pre-granted: npm 403s on `access grant` for a package that does
+      # not exist yet. It has to happen right after the first publish, which is exactly
+      # the moment a human forgets. So it runs here.
+      #
+      # Needs a token because OIDC's short-lived credential only authorises the publish
+      # itself, not org administration. Non-fatal: a failure here leaves the package
+      # published and owned by the publishing user, which is recoverable with one
+      # command — it must not fail an otherwise-good release.
+      - name: Give the org read-write on the package
+        if: ${{ env.HAVE_ADMIN_TOKEN == 'true' }}
+        env:
+          NPM_ADMIN_TOKEN: ${{ secrets.NPM_ADMIN_TOKEN }}
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${NPM_ADMIN_TOKEN}" > ~/.npmrc
+          npm access grant read-write shadow-software:developers "$(node -p "require('./package.json').name")" \
+            || echo "::warning::could not grant org access — run 'npm access grant read-write shadow-software:developers n8n-nodes-custom-exec' by hand"
+          rm -f ~/.npmrc
