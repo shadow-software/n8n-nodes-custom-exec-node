@@ -30,7 +30,7 @@ several exec services.
 > See our other node, **[n8n-nodes-huggingface-space](https://www.npmjs.com/package/n8n-nodes-huggingface-space)**,
 > for running AI models from any Hugging Face Space.
 
-[Installation](#installation) · [Credentials](#credentials) · [The exec service](#the-exec-service) · [Usage](#usage) · [Response](#response) · [Security](#security) · [Compatibility](#compatibility)
+[Installation](#installation) · [Credentials](#credentials) · [The exec service](#the-exec-service) · [Usage](#usage) · [Try it](#try-it--a-one-click-demo-workflow) · [Response](#response) · [Security](#security) · [Compatibility](#compatibility)
 
 ## Installation
 
@@ -119,6 +119,17 @@ command against it, and pick the result back up.
   failing the node.
 - **Additional Options → Return Full Output** — return `stdout` and `stderr` as
   separate fields rather than a single `output` field.
+
+## Try it — a one-click demo workflow
+
+Every field below is set through the node's real UI. Wire a Manual Trigger into
+Remote Exec, pick or create a **Remote Exec API** credential (Base URL + optional
+Token), write a **Command**, click **Execute workflow**.
+
+<p align="center"><img src="docs/demo-remote-exec-canvas.png" alt="Remote Exec demo workflow: Manual Trigger into Remote Exec" width="700"></p>
+<p align="center"><img src="docs/demo-remote-exec-config.png" alt="Node configuration: Credential, Command, Timeout, Ignore Errors, Additional Options" width="700"></p>
+<p align="center"><img src="docs/demo-remote-exec-green-run.png" alt="Successful execution: both nodes green-checked" width="700"></p>
+<p align="center"><img src="docs/demo-remote-exec-output.png" alt="Execution output: exitCode 0, durationMs 1, output 'Hello from the Shadow Software exec sidecar'" width="700"></p>
 
 ## Response
 
