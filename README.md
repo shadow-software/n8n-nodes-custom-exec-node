@@ -126,10 +126,24 @@ Every field below is set through the node's real UI. Wire a Manual Trigger into
 Remote Exec, pick or create a **Remote Exec API** credential (Base URL + optional
 Token), write a **Command**, click **Execute workflow**.
 
-<p align="center"><img src="docs/demo-remote-exec-canvas.png" alt="Remote Exec demo workflow: Manual Trigger into Remote Exec" width="700"></p>
-<p align="center"><img src="docs/demo-remote-exec-config.png" alt="Node configuration: Credential, Command, Timeout, Ignore Errors, Additional Options" width="700"></p>
-<p align="center"><img src="docs/demo-remote-exec-green-run.png" alt="Successful execution: both nodes green-checked" width="700"></p>
-<p align="center"><img src="docs/demo-remote-exec-output.png" alt="Execution output: exitCode 0, durationMs 1, output 'Hello from the Shadow Software exec sidecar'" width="700"></p>
+*(Watch it run)*
+
+<p align="center">
+  <a href="https://shadowsoftware.com/assets/videos/n8n-node-demos/demo-remote-exec.mp4">
+    <img src="https://shadowsoftware.com/assets/images/n8n-node-demos/demo-remote-exec.gif" alt="Live demo: open Remote Exec, set Credential/Command/Timeout, execute, and read the sidecar output" width="700">
+  </a>
+</p>
+<p align="center">
+  <a href="https://shadowsoftware.com/assets/videos/n8n-node-demos/demo-remote-exec.mp4">▶ Full video (MP4)</a>
+  ·
+  <a href="https://shadowsoftware.com/assets/images/n8n-node-demos/demo-remote-exec.mp4">same file under /assets/images</a>
+</p>
+
+Open the node → bind the credential → write the command → execute:
+
+<p align="center"><img src="https://shadowsoftware.com/assets/images/n8n-node-demos/demo-remote-exec-config.png" alt="Node UI open: Credential, Command, Timeout, Ignore Errors, Additional Options" width="700"></p>
+<p align="center"><img src="https://shadowsoftware.com/assets/images/n8n-node-demos/demo-remote-exec-green-run-live.png" alt="Successful run: both nodes green-checked" width="700"></p>
+<p align="center"><img src="https://shadowsoftware.com/assets/images/n8n-node-demos/demo-remote-exec-output-live.png" alt="Execution output: exitCode 0 and 'Hello from the Shadow Software exec sidecar'" width="700"></p>
 
 ## Response
 
