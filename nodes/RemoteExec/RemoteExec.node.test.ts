@@ -1,18 +1,28 @@
-import { describe, test, expect, vi } from 'vitest';
-
 // Mock n8n-workflow so the test needs no n8n install (same idiom as the sibling's
 // HuggingFaceSpace.node.test.ts — a hand-rolled NodeOperationError that records the
 // message and context).
 vi.mock('n8n-workflow', () => {
 	class NodeOperationError extends Error {
 		context: unknown;
-		constructor(_node: unknown, message: string, context?: unknown) {
-			super(message);
+		constructor(_node: unknown, messageOrError: string | Error, context?: unknown) {
+			super(typeof messageOrError === 'string' ? messageOrError : messageOrError.message);
 			this.name = 'NodeOperationError';
 			this.context = context;
 		}
 	}
-	return { NodeOperationError };
+	class NodeApiError extends Error {
+		context: unknown;
+		constructor(_node: unknown, errorResponse: Record<string, unknown>, context?: unknown) {
+			super(String(errorResponse?.message ?? 'Node API error'));
+			this.name = 'NodeApiError';
+			this.context = context;
+		}
+	}
+	return {
+		NodeOperationError,
+		NodeApiError,
+		NodeConnectionTypes: { Main: 'main' },
+	};
 });
 
 import { RemoteExec } from './RemoteExec.node';
@@ -65,7 +75,7 @@ describe('RemoteExec.description', () => {
 		const d = node.description;
 		expect(d.name).toBe('remoteExec');
 		expect(d.displayName).toBe('Remote Exec');
-		expect(d.icon).toBe('file:remoteExec.svg');
+		expect(d.icon).toEqual({ light: 'file:remoteExec.svg', dark: 'file:remoteExecDark.svg' });
 		expect(d.credentials).toEqual([{ name: 'remoteExecApi', required: true }]);
 		// the exact parameter surface carried over from the internal node
 		const params = d.properties.map((p) => p.name);
@@ -105,10 +115,8 @@ describe('RemoteExec.execute', () => {
 
 	test('reads baseUrl and token from the credential, not the environment', async () => {
 		// Prove no env coupling: EXEC_SIDECAR_* set in the environment must be ignored.
-		const OLD_URL = process.env.EXEC_SIDECAR_URL;
-		const OLD_TOK = process.env.EXEC_SIDECAR_TOKEN;
-		process.env.EXEC_SIDECAR_URL = 'http://env-should-be-ignored:9999';
-		process.env.EXEC_SIDECAR_TOKEN = 'env-token-should-be-ignored';
+		vi.stubEnv('EXEC_SIDECAR_URL', 'http://env-should-be-ignored:9999');
+		vi.stubEnv('EXEC_SIDECAR_TOKEN', 'env-token-should-be-ignored');
 		try {
 			const { ctx, httpRequest } = makeCtx({
 				params: BASE_PARAMS,
@@ -125,8 +133,7 @@ describe('RemoteExec.execute', () => {
 			expect(call.url).not.toContain('env-should-be-ignored');
 			expect(JSON.stringify(call)).not.toContain('env-token');
 		} finally {
-			OLD_URL === undefined ? delete process.env.EXEC_SIDECAR_URL : (process.env.EXEC_SIDECAR_URL = OLD_URL);
-			OLD_TOK === undefined ? delete process.env.EXEC_SIDECAR_TOKEN : (process.env.EXEC_SIDECAR_TOKEN = OLD_TOK);
+			vi.unstubAllEnvs();
 		}
 	});
 
@@ -227,7 +234,7 @@ describe('RemoteExec.execute', () => {
 		expect(httpRequest).not.toHaveBeenCalled();
 	});
 
-	test('an unreachable service throws a NodeOperationError naming the base URL', async () => {
+	test('an unreachable service surfaces the underlying HTTP error message', async () => {
 		const httpRequest = vi.fn(async () => {
 			throw new Error('connect ECONNREFUSED 10.0.0.1:8080');
 		});
@@ -238,7 +245,6 @@ describe('RemoteExec.execute', () => {
 		});
 		const err = await run(ctx).catch((e) => e);
 		expect(err.name).toBe('NodeOperationError');
-		expect(err.message).toMatch(/Failed to reach the remote exec service at http:\/\/exec-sidecar:8080/);
 		expect(err.message).toMatch(/ECONNREFUSED/);
 	});
 

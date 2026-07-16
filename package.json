@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-custom-exec",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "description": "Run a command on a remote execution service (e.g. an ffmpeg/tooling sidecar) from n8n, over HTTP, configured by credential.",
   "keywords": [
     "n8n-community-node-package",

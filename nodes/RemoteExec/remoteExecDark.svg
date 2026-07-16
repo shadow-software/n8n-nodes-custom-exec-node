@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 60 60" role="img" aria-label="Remote Exec by Shadow Software">
+  <title>Remote Exec</title>
+  <path d="M30 2.5 53 15.75v26.5L30 55.5 7 42.25v-26.5z"
+        fill="#f6f8fb" stroke="#4e8f2e" stroke-width="2.8" stroke-linejoin="round"/>
+  <path d="M19 22.5 27.5 30 19 37.5"
+        fill="none" stroke="#4e8f2e" stroke-width="4.2"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="31.5" y="34.6" width="12" height="4" rx="2" fill="#1f2933">
+    <animate attributeName="opacity" values="1;1;0.15;0.15;1" dur="1.6s" repeatCount="indefinite"/>
+  </rect>
+</svg>

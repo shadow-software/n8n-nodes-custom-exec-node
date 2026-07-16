@@ -3,6 +3,9 @@ import {
 	INodeExecutionData,
 	INodeType,
 	INodeTypeDescription,
+	JsonObject,
+	NodeApiError,
+	NodeConnectionTypes,
 	NodeOperationError,
 } from 'n8n-workflow';
 
@@ -23,14 +26,16 @@ export class RemoteExec implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Remote Exec',
 		name: 'remoteExec',
-		icon: 'file:remoteExec.svg',
+		icon: { light: 'file:remoteExec.svg', dark: 'file:remoteExecDark.svg' },
+		subtitle: 'Execute remote command',
 		group: ['transform'],
 		version: 1,
 		description:
 			'Execute a shell command on a remote execution service (e.g. an ffmpeg/tooling sidecar). Supports n8n templating in the command field.',
 		defaults: { name: 'Remote Exec' },
-		inputs: ['main'],
-		outputs: ['main'],
+		inputs: [NodeConnectionTypes.Main],
+		outputs: [NodeConnectionTypes.Main],
+		usableAsTool: true,
 		credentials: [
 			{
 				name: 'remoteExecApi',
@@ -134,12 +139,7 @@ export class RemoteExec implements INodeType {
 						},
 					)) as typeof response;
 				} catch (err) {
-					const e = err as Error;
-					throw new NodeOperationError(
-						this.getNode(),
-						`Failed to reach the remote exec service at ${baseUrl}: ${e.message}`,
-						{ itemIndex },
-					);
+					throw new NodeApiError(this.getNode(), err as JsonObject, { itemIndex });
 				}
 
 				const { exitCode, stdout, stderr, durationMs } = response;
@@ -170,7 +170,7 @@ export class RemoteExec implements INodeType {
 					returnData.push({ json: { error: (err as Error).message }, pairedItem: itemIndex });
 					continue;
 				}
-				throw err;
+				throw new NodeOperationError(this.getNode(), err as Error, { itemIndex });
 			}
 		}
 
