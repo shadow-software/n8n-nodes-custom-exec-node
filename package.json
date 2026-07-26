@@ -1,7 +1,7 @@
 {
   "name": "n8n-nodes-custom-exec",
-  "version": "2.0.4",
-  "description": "Run a command on a remote execution service (e.g. an ffmpeg/tooling sidecar) from n8n, over HTTP, configured by credential.",
+  "version": "3.0.0",
+  "description": "Run a shell command in an exec sidecar (ffmpeg + fonts) from n8n, over HTTP. Supports n8n templating in the command field.",
   "keywords": [
     "n8n-community-node-package",
     "n8n",
@@ -32,9 +32,9 @@
   "scripts": {
     "build": "npx rimraf dist && tsc && gulp build:icons",
     "dev": "tsc --watch",
-    "format": "prettier nodes credentials --write",
-    "lint": "eslint nodes credentials package.json",
-    "lintfix": "eslint nodes credentials package.json --fix",
+    "format": "prettier nodes --write",
+    "lint": "eslint nodes package.json",
+    "lintfix": "eslint nodes package.json --fix",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "prepublishOnly": "npm run build && npm run lint && npm run test"
@@ -44,11 +44,9 @@
   ],
   "n8n": {
     "n8nNodesApiVersion": 1,
-    "credentials": [
-      "dist/credentials/RemoteExecApi.credentials.js"
-    ],
+    "credentials": [],
     "nodes": [
-      "dist/nodes/RemoteExec/RemoteExec.node.js"
+      "dist/nodes/CustomExecNode/CustomExecNode.node.js"
     ]
   },
   "devDependencies": {

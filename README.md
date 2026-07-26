@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/shadow-software/n8n-nodes-custom-exec-node/main/.github/assets/banner.svg" alt="Remote Exec — community node for n8n, by Shadow Software" width="880">
+  <img src="https://raw.githubusercontent.com/shadow-software/n8n-nodes-custom-exec-node/main/.github/assets/banner.svg" alt="Custom Exec — community node for n8n, by Shadow Software" width="880">
 </p>
 
 <p align="center">
@@ -11,26 +11,25 @@
 
 # n8n-nodes-custom-exec
 
-Run a command on a **remote execution service** from n8n, over HTTP.
+Run a shell command in an **exec sidecar** from n8n, over HTTP.
 
 Some jobs need a real shell and real tooling — `ffmpeg`, `imagemagick`, `pandoc`,
-`yt-dlp`, a font stack — that the n8n image deliberately does not ship. The usual
-answer is to stand up a small sidecar: an HTTP service that accepts a command,
-runs it, and returns the result. This node is the n8n end of that arrangement. You
-point it at your service with a credential, give it a command (n8n expressions and
-all), and it hands back the exit code, output and duration.
+`yt-dlp`, a font stack — that a hardened n8n image deliberately does not ship. The
+usual answer is to stand up a small sidecar: an HTTP service that accepts a command,
+runs it, and returns the result. This node is the n8n end of that arrangement. Give
+it a command (n8n expressions and all) and it hands back the exit code, output and
+duration.
 
-The connection lives entirely on a **Remote Exec API** credential — base URL plus
-an optional shared secret — so the node reads nothing from the environment. That is
-both what n8n's node verification requires and what lets one n8n instance talk to
-several exec services.
+The sidecar's URL and an optional shared secret are read from environment variables
+on the n8n container — `EXEC_SIDECAR_URL` and `EXEC_SIDECAR_TOKEN` — not from a
+credential, so there's nothing to configure per-workflow beyond the command itself.
 
 > Built and maintained by **[Shadow Software](https://shadowsoftware.com)** — we run
 > n8n in production across a family of products and open-source the nodes we rely on.
 > See our other node, **[n8n-nodes-huggingface-space](https://www.npmjs.com/package/n8n-nodes-huggingface-space)**,
 > for running AI models from any Hugging Face Space.
 
-[Installation](#installation) · [Credentials](#credentials) · [The exec service](#the-exec-service) · [Usage](#usage) · [Try it](#try-it--a-one-click-demo-workflow) · [Response](#response) · [Security](#security) · [Compatibility](#compatibility)
+[Installation](#installation) · [Configuration](#configuration) · [The exec sidecar](#the-exec-sidecar) · [Usage](#usage) · [Response](#response) · [Security](#security) · [Compatibility](#compatibility)
 
 ## Installation
 
@@ -43,29 +42,25 @@ Self-hosted, from the CLI:
 npm install n8n-nodes-custom-exec
 ```
 
-## Credentials
+## Configuration
 
-The node requires a **Remote Exec API** credential with two fields:
+Set these environment variables on the **n8n container** (not per-workflow):
 
-- **Base URL** — where your exec service lives, e.g. `http://exec-sidecar:8080`.
-  Commands are POSTed to `{baseUrl}/exec`.
-- **Token** *(optional)* — a shared secret. When set, it is sent as the
-  `X-EXEC-TOKEN` header on every request; leave it empty if the service is
-  unauthenticated.
+- **`EXEC_SIDECAR_URL`** — where your exec sidecar lives, e.g.
+  `http://exec-sidecar:8080`. Defaults to that value if unset. Commands are
+  POSTed to `{EXEC_SIDECAR_URL}/exec`.
+- **`EXEC_SIDECAR_TOKEN`** *(optional)* — a shared secret. When set, it is sent
+  as the `X-EXEC-TOKEN` header on every request; leave it unset if the sidecar
+  is unauthenticated.
 
-The credential's **Test** button issues a `GET {baseUrl}/health`, so your service
-should answer that path with a 200 for the test to pass. Testing never runs a
-command.
+## The exec sidecar
 
-## The exec service
-
-The exec service is yours to run — the node is only the n8n client. Any HTTP server
+The sidecar is yours to run — the node is only the n8n client. Any HTTP server
 works as long as it honours this tiny contract:
 
 | Route | Purpose |
 | --- | --- |
 | `POST /exec` | body `{ "command": string, "timeout": number }` → `{ "exitCode": number, "stdout": string, "stderr": string, "durationMs": number }` |
-| `GET /health` | `200` when healthy (used by the credential's **Test** button) |
 
 A minimal reference implementation is a few dozen lines. For example, in Node:
 
@@ -75,9 +70,7 @@ import { exec } from 'node:child_process';
 
 const app = express();
 app.use(express.json());
-const TOKEN = process.env.EXEC_TOKEN; // set the same value on the credential
-
-app.get('/health', (_req, res) => res.sendStatus(200));
+const TOKEN = process.env.EXEC_TOKEN; // set the same value as EXEC_SIDECAR_TOKEN
 
 app.post('/exec', (req, res) => {
   if (TOKEN && req.get('X-EXEC-TOKEN') !== TOKEN) return res.sendStatus(401);
@@ -95,8 +88,8 @@ app.listen(8080);
 ```
 
 Run it in a container that has the tooling you need (`ffmpeg`, fonts, `imagemagick`,
-…) alongside n8n, mount a shared volume into both, and point the credential at it.
-Read the **[Security](#security)** section before you expose it anywhere.
+…) alongside n8n, mount a shared volume into both, and point `EXEC_SIDECAR_URL` at
+it. Read the **[Security](#security)** section before you expose it anywhere.
 
 ## Usage
 
@@ -108,42 +101,17 @@ ffmpeg -y -i /shared/{{ $json.inputFile }} \
   -vf "scale=1280:-1" /shared/{{ $json.outputFile }}
 ```
 
-If both the exec service and n8n mount the same `/shared` volume at the same path,
+If both the sidecar and n8n mount the same `/shared` volume at the same path,
 files written by one are visible to the other, so a workflow can drop a file, run a
 command against it, and pick the result back up.
 
-- **Timeout (Seconds)** — the budget passed to the service. The node allows an
+- **Timeout (seconds)** — the budget passed to the sidecar. The node allows an
   extra 30 seconds on the HTTP call itself so a job that runs right up to its
   deadline still returns its result rather than being cut off in transit.
 - **Ignore Errors** — when on, a non-zero exit is returned as data instead of
   failing the node.
 - **Additional Options → Return Full Output** — return `stdout` and `stderr` as
   separate fields rather than a single `output` field.
-
-## Try it — a one-click demo workflow
-
-Every field below is set through the node's real UI. Wire a Manual Trigger into
-Remote Exec, pick or create a **Remote Exec API** credential (Base URL + optional
-Token), write a **Command**, click **Execute workflow**.
-
-*(Watch it run)*
-
-<p align="center">
-  <a href="https://shadowsoftware.com/assets/videos/n8n-node-demos/demo-remote-exec.mp4">
-    <img src="https://shadowsoftware.com/assets/images/n8n-node-demos/demo-remote-exec.gif" alt="Live demo: open Remote Exec, set Credential/Command/Timeout, execute, and read the sidecar output" width="700">
-  </a>
-</p>
-<p align="center">
-  <a href="https://shadowsoftware.com/assets/videos/n8n-node-demos/demo-remote-exec.mp4">▶ Full video (MP4)</a>
-  ·
-  <a href="https://shadowsoftware.com/assets/images/n8n-node-demos/demo-remote-exec.mp4">same file under /assets/images</a>
-</p>
-
-Open the node → bind the credential → write the command → execute:
-
-<p align="center"><img src="https://shadowsoftware.com/assets/images/n8n-node-demos/demo-remote-exec-config.png" alt="Node UI open: Credential, Command, Timeout, Ignore Errors, Additional Options" width="700"></p>
-<p align="center"><img src="https://shadowsoftware.com/assets/images/n8n-node-demos/demo-remote-exec-green-run-live.png" alt="Successful run: both nodes green-checked" width="700"></p>
-<p align="center"><img src="https://shadowsoftware.com/assets/images/n8n-node-demos/demo-remote-exec-output-live.png" alt="Execution output: exitCode 0 and 'Hello from the Shadow Software exec sidecar'" width="700"></p>
 
 ## Response
 
@@ -166,19 +134,19 @@ With **Return Full Output** on, `output` is replaced by separate `stdout` and
 
 ## Security
 
-**This node runs arbitrary shell commands on whatever service the credential points
-at.** Anyone who can edit the workflow can run any command that service allows,
-with that service's privileges and filesystem access.
+**This node runs arbitrary shell commands on whatever sidecar `EXEC_SIDECAR_URL`
+points at.** Anyone who can edit the workflow can run any command that sidecar
+allows, with that sidecar's privileges and filesystem access.
 
-- Only point the credential at an exec service **you control**, on a network you
+- Only point `EXEC_SIDECAR_URL` at a sidecar **you control**, on a network you
   trust — never a shared or public endpoint.
-- Set a **Token** and have the service reject requests without a matching
-  `X-EXEC-TOKEN`. Do not expose the service unauthenticated.
-- Run the service with the least privilege it needs (a non-root user, a scoped
+- Set `EXEC_SIDECAR_TOKEN` and have the sidecar reject requests without a
+  matching `X-EXEC-TOKEN`. Do not expose the sidecar unauthenticated.
+- Run the sidecar with the least privilege it needs (a non-root user, a scoped
   volume, no host networking), and enforce your own timeout ceiling on its side —
   the client-supplied timeout is a request, not a guarantee.
 
-Treat the exec service as a remote shell, because that is exactly what it is.
+Treat the exec sidecar as a remote shell, because that is exactly what it is.
 
 ## Compatibility
 

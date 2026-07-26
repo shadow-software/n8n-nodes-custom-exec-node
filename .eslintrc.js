@@ -41,20 +41,6 @@ module.exports = {
 			},
 		},
 		{
-			files: ['./credentials/**/*.ts'],
-			plugins: ['eslint-plugin-n8n-nodes-base'],
-			extends: ['plugin:n8n-nodes-base/credentials'],
-			rules: {
-				// This rule wants `documentationUrl` camelCased into a docs-site SLUG. Its
-				// own description says "Only applicable to nodes in the main repository" —
-				// n8n's internal credentials link into docs.n8n.io by slug. A COMMUNITY
-				// credential has no such slug, and the sibling rule
-				// `cred-class-field-documentation-url-not-http-url` demands a real HTTP URL,
-				// so the two directly contradict each other here. We ship the working link.
-				'n8n-nodes-base/cred-class-field-documentation-url-miscased': 'off',
-			},
-		},
-		{
 			files: ['./nodes/**/*.ts'],
 			plugins: ['eslint-plugin-n8n-nodes-base'],
 			extends: ['plugin:n8n-nodes-base/nodes'],
