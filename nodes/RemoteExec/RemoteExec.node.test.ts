@@ -234,7 +234,11 @@ describe('RemoteExec.execute', () => {
 		expect(httpRequest).not.toHaveBeenCalled();
 	});
 
-	test('an unreachable service surfaces the underlying HTTP error message', async () => {
+	test('an unreachable service surfaces the underlying HTTP error message as a NodeApiError', async () => {
+		// The outer catch must propagate this as-is, not re-wrap it as a generic
+		// NodeOperationError — NodeApiError carries structured HTTP details
+		// (httpCode, description) that n8n's UI renders specially, and a re-wrap
+		// would discard them.
 		const httpRequest = vi.fn(async () => {
 			throw new Error('connect ECONNREFUSED 10.0.0.1:8080');
 		});
@@ -244,7 +248,7 @@ describe('RemoteExec.execute', () => {
 			httpRequest,
 		});
 		const err = await run(ctx).catch((e) => e);
-		expect(err.name).toBe('NodeOperationError');
+		expect(err.name).toBe('NodeApiError');
 		expect(err.message).toMatch(/ECONNREFUSED/);
 	});
 

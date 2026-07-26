@@ -170,7 +170,11 @@ export class RemoteExec implements INodeType {
 					returnData.push({ json: { error: (err as Error).message }, pairedItem: itemIndex });
 					continue;
 				}
-				throw new NodeOperationError(this.getNode(), err as Error, { itemIndex });
+				// Every error reaching this point is already a NodeOperationError or a
+				// NodeApiError thrown above — both carry structured details (httpCode,
+				// description) that n8n's UI renders specially. Re-wrapping as a generic
+				// NodeOperationError here would discard that; just propagate it.
+				throw err;
 			}
 		}
 
