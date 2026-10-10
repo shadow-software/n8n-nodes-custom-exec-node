@@ -1,0 +1,70 @@
+{
+  "name": "n8n-nodes-custom-exec",
+  "version": "3.0.0",
+  "description": "Run a shell command in an exec sidecar (ffmpeg + fonts) from n8n, over HTTP. Supports n8n templating in the command field.",
+  "keywords": [
+    "n8n-community-node-package",
+    "n8n",
+    "exec",
+    "command",
+    "ffmpeg",
+    "shell",
+    "sidecar"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/shadow-software/n8n-nodes-custom-exec-node",
+  "author": {
+    "name": "Shadow Software",
+    "email": "info@shadowsoftware.com",
+    "url": "https://shadowsoftware.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shadow-software/n8n-nodes-custom-exec-node.git"
+  },
+  "bugs": {
+    "url": "https://github.com/shadow-software/n8n-nodes-custom-exec-node/issues"
+  },
+  "engines": {
+    "node": ">=20.15"
+  },
+  "main": "index.js",
+  "scripts": {
+    "build": "npx rimraf dist && tsc && gulp build:icons",
+    "dev": "tsc --watch",
+    "format": "prettier nodes --write",
+    "lint": "eslint nodes package.json",
+    "lintfix": "eslint nodes package.json --fix",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "prepublishOnly": "npm run build && npm run lint && npm run test"
+  },
+  "files": [
+    "dist"
+  ],
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "credentials": [],
+    "nodes": [
+      "dist/nodes/CustomExecNode/CustomExecNode.node.js"
+    ]
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.15.0",
+    "@vitest/coverage-v8": "^3.2.7",
+    "eslint": "^8.57.0",
+    "eslint-plugin-n8n-nodes-base": "^1.16.3",
+    "gulp": "^5.0.0",
+    "jsonc-eslint-parser": "^2.4.2",
+    "n8n-workflow": "*",
+    "prettier": "^3.3.2",
+    "rimraf": "^5.0.7",
+    "typescript": "^5.5.3",
+    "vitest": "^3.2.7"
+  },
+  "peerDependencies": {
+    "n8n-workflow": "*"
+  }
+}
