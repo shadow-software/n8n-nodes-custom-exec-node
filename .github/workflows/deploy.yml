@@ -1,4 +1,4 @@
-name: Publish to npm
+name: Deploy
 
 # n8n will not verify a community node published from a developer's laptop: from
 # 2026-05-01 a verified package must be published by CI with an npm provenance
@@ -7,7 +7,7 @@ name: Publish to npm
 #
 # Setup, once, before the first release:
 #   1. On npmjs.com, add this repo as a Trusted Publisher for the package
-#      (Settings -> Trusted Publishers -> GitHub Actions, workflow: publish.yml).
+#      (Settings -> Trusted Publishers -> GitHub Actions, workflow: deploy.yml).
 #   2. Push a tag: `npm version patch && git push --follow-tags`.
 # No NPM_TOKEN secret is needed — Trusted Publishing exchanges the OIDC token.
 
@@ -23,7 +23,7 @@ on:
       - 'nodes/**'
       - 'credentials/**'
       - 'package.json'
-      - '.github/workflows/publish.yml'
+      - '.github/workflows/deploy.yml'
   workflow_dispatch:
 
 permissions:

@@ -1,16 +1,83 @@
+# Public repo: always GitHub-hosted (ubuntu-latest). Do NOT set CI_RUNNER.
+# Estate contract: PR-only CI + Deploy. Secret-scan and boot-budget live
+# inside this workflow (not separate Actions).
+
 name: CI
 
 on:
-  push:
-    branches: [main, master]
   pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.repository }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
+  trufflehog:
+    name: TruffleHog filesystem tip scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install TruffleHog
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh \
+            | sh -s -- -b /usr/local/bin
+          trufflehog --version
+
+      - name: Scan for secrets
+        run: |
+          set -euo pipefail
+          cat > /tmp/th-exclude <<'EOF'
+          (^|/)(node_modules|vendor|dist|build|\.git)(/|$)
+          (^|/)package-lock\.json$
+          (^|/)composer\.lock$
+          (^|/)google-services\.json$
+          (^|/)_wildcard\.localhost.*-key\.pem$
+          (^|/)openpgp\.js$
+          (^|/)(\.agents/vendor-src)(/|$)
+          EOF
+          trufflehog filesystem . \
+            --fail \
+            --no-update \
+            --exclude-paths=/tmp/th-exclude \
+            --results=verified,unknown
+
+  repo-boot-budget:
+    name: Repo boot budget
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Measure repository boot markdown
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          total = 0
+          for name in ("CLAUDE.md", "AGENTS.md"):
+              path = Path(name)
+              if path.is_symlink():
+                  raise SystemExit(f"unsupported root-doc symlink: {path}")
+              if not path.exists():
+                  continue
+              raw = path.read_bytes()
+              text = raw.decode("utf-8", errors="replace")
+              total += int(max(len(text.encode("utf-8")) / 4.0, len(text.split()) / 0.75))
+
+          print(f"repo boot estimate: {total:,} tokens (budget 100,000)")
+          if total > 100_000:
+              raise SystemExit("repo boot markdown exceeds 100,000-token budget")
+          PY
+
   build:
+    needs: [trufflehog, repo-boot-budget]
     runs-on: ubuntu-latest
 
     strategy:
@@ -18,16 +85,13 @@ jobs:
         node-version: [20.x, 22.x]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
 
-      # `n8n-workflow` drags in `isolated-vm`, a native addon whose postinstall
-      # compiles C++. We consume only its type declarations, so skip install
-      # scripts rather than install a toolchain to build something never loaded.
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
