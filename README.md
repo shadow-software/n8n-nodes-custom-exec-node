@@ -191,12 +191,12 @@ touch at **[shadowsoftware.com](https://shadowsoftware.com)**.
 
 ## Trusted Publisher (npm)
 
-Publishing uses GitHub Actions OIDC via `.github/workflows/deploy.yml` (not
+Publishing uses GitHub Actions OIDC via `.github/workflows/publish.yml` (not
 `publish.yml`). On npmjs.com the package Trusted Publisher workflow name must
-be exactly `deploy.yml`. Re-point both community packages with:
+be exactly `publish.yml`. Re-point both community packages with:
 
 ```bash
-ss-npm-trust-n8n-publishers
+ss-npm-trust-n8n-publishers # (points at publish.yml)
 ```
 
 (Requires an npm login that can complete OTP / WebAuthn — GAT bypass-2FA tokens are rejected.)
